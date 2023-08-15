@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: camel-build-deployment
+  labels:
+    app: camel-build
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: camel-build
+  template:
+    metadata:
+      labels:
+        app: camel-build
+    spec:
+      containers:
+      - name: camel-builder
+        image: ubuntu
+        command: ["/bin/sh", "-c"]
+        args:
+        - apt-get update && apt-get install -y openjdk-17-jdk maven git &&
+          git clone https://github.com/aymenfurter/c14r.io.git /tmp/c14r &&
+          cd /tmp/c14r/ridik &&
+          mvn clean install -DskipTests &&
+          sleep infinity

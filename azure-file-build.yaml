@@ -1,0 +1,69 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: my-azurefile
+provisioner: file.csi.azure.com # replace with "kubernetes.io/azure-file" if aks version is less than 1.21
+allowVolumeExpansion: true
+mountOptions:
+  - dir_mode=0777
+  - file_mode=0777
+  - uid=0
+  - gid=0
+  - mfsymlinks
+  - cache=strict
+  - actimeo=30
+parameters:
+  skuName: Premium_LRS
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-azurefile
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: my-azurefile
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: camel-azf-build-deployment
+  labels:
+    app: camel-azf-build
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: camel-azf-build
+  template:
+    metadata:
+      labels:
+        app: camel-azf-build
+    spec:
+      volumes:
+      - name: azurefile-storage
+        persistentVolumeClaim:
+          claimName: my-azurefile
+      initContainers:
+      containers:
+      - name: camel-builder
+        image: ubuntu
+        command: ["/bin/sh", "-c"]
+        args:
+        - apt-get update &&
+          apt-get install -y openjdk-17-jdk maven git &&
+          rm -rf /mnt/azure/c14r &&
+          rm -rf /mnt/azure/.m2 &&
+          mkdir /mnt/azure/.m2 &&
+          git clone https://github.com/aymenfurter/c14r.io.git /mnt/azure/c14r &&
+          cd /mnt/azure/c14r/ridik &&
+          mvn dependency:go-offline -Dmaven.repo.local=/mnt/azure/.m2 &&
+          mvn clean install -o -DskipTests -Dmaven.repo.local=/mnt/azure/.m2 &&
+          sleep infinity
+        volumeMounts:
+        - mountPath: "/mnt/azure"
+          name: azurefile-storage
+
